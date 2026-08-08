@@ -185,20 +185,21 @@ def main():
 
     student_topic = (
         "你是一名模擬遊戲玩家。\n\n"
-        "請根據環境描述做出行動，但不要提到任何數值或狀態變化，只描述角色行動。\n\n"
+        #"請根據環境描述做出行動，但不要提到任何數值或狀態變化，只描述角色行動。\n\n"
         f"初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
         f"消耗規則:\n{json.dumps(j2, ensure_ascii=False)}\n\n"
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
         f"模擬引擎輸出：\n{teacher_resp}"
     )
+    print(student_topic)
     trace.append({
             "turn":0,
             "player":student_topic,
             "gm":teacher_topic
         })
-    student_resp = student_chat.send(student_topic)
-
-    print(f"\n👩 玩家-第1步\n{student_resp}\n")
+    #student_resp = student_chat.send(student_topic)
+    student_resp = input("請輸入玩家行動：\n")
+    #print(f"\n👩 玩家-第1步\n{student_resp}\n")
 
     teacher_resp = teacher_chat.send(student_resp)
 
@@ -217,13 +218,11 @@ def main():
     rounds = 1
     
     for i in range(2, rounds + 2):
-        
-        student_resp = student_chat.send(
-            teacher_resp
-        )
 
-        print(f"\n玩家{i}")
-        print(student_resp)
+        print(f"\n玩家第{i}輪行動：")
+        student_resp = input("請輸入玩家行動：\n")
+
+        #print(student_resp)
         teacher_resp = teacher_chat.send(
             student_resp
         )
@@ -261,7 +260,7 @@ def main():
     )
 
     with open(
-    f"log/trace_{formatted_time}.json",
+    f"log/human_evaluation_{formatted_time}.json",
     "w",
     encoding="utf8"
     ) as f:
