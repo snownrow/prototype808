@@ -6,6 +6,8 @@ from openai import OpenAI
 import re
 import os
 from dotenv import load_dotenv
+import observer 
+
 load_dotenv()
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
@@ -43,7 +45,6 @@ class ChatAgent:
 
         return text
 
-
 def main():
 
     student_chat = ChatAgent(
@@ -77,6 +78,7 @@ def main():
         },
     }
     trace = []
+    observer_history = []
     j3 = {
         "每輪消耗": "一次玩家行動為一輪",
         "電力低於10": "照明關閉且無法啟動",
@@ -84,8 +86,7 @@ def main():
         "電力低於0": "遊戲結束",
         "壓力高於20": "遊戲結束"
     }
- 
-
+    
     teacher_topic = (
 
         "你現在是一個嚴謹的環境模擬引擎。\n\n"
@@ -124,7 +125,7 @@ def main():
 
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    print(f"\n👦 GM-init\n{teacher_resp}\n")
+    print(f"\n👦 GM-第0步\n{teacher_resp}\n")
 
     student_topic = (
         "你是一名模擬遊戲玩家。\n\n"
@@ -141,19 +142,30 @@ def main():
         })
     student_resp = student_chat.send(student_topic)
 
-    print(f"\n👩 player-the 1 step\n{student_resp}\n")
+    print(f"\n👩 玩家-第1步\n{student_resp}\n")
 
     teacher_resp = teacher_chat.send(student_resp)
 
-    print(f"\n👦 GM-the 1 step\n{teacher_resp}\n")
-    
-
+    print(f"\n👦 GM-第1步\n{teacher_resp}\n")
+    observer_history.append({
+        #"turn":1,
+        #"player":student_resp,
+        "gm":teacher_resp
+    })
+    pred_state = observer.extract_state(
+                json.dumps(
+                    observer_history,
+                    ensure_ascii=False
+                )
+            )
     trace.append({
         "turn":1,
         "player":student_resp,
-        "gm":teacher_resp
+        "gm":teacher_resp,
+        "pred_state":pred_state
     })
-    rounds = 10
+    rounds = 1
+    
     
     for i in range(2, rounds + 2):
         
@@ -161,20 +173,38 @@ def main():
             teacher_resp
         )
 
-        print(f"\n👩 player-the {i} step")
+        print(f"\n玩家{i}")
         print(student_resp)
         teacher_resp = teacher_chat.send(
             student_resp
         )
-        print(f"\n👦 GM-the {i} step")
+        print(f"\n👦 GM-{i}")
         print(teacher_resp)
-
+        # observer_history.append(
+        #     {
+        #         "turn": i,
+        #         "player": student_resp,
+        #         "gm": teacher_resp
+        #     }
+        # )
+        
+        # observer_input = json.dumps(
+        #     observer_history,
+        #     ensure_ascii=False
+        # )
+        observer_input = {
+            "turn": i,
+            "gm": teacher_resp
+        }
+        
+        pred_state = observer.extract_state(observer_input)
 
 
         trace.append({
             "turn": i,
             "player": student_resp,
-            "gm": teacher_resp
+            "gm": teacher_resp,
+            "pred_state": pred_state
         })
 
         time.sleep(1)
@@ -188,7 +218,7 @@ def main():
         final_query
     )
 
-    print("\n===== final =====")
+    print("\n===== 最終結果 =====")
     print(final_resp)
     trace.append({
         "turn":"final",
@@ -200,7 +230,7 @@ def main():
     )
 
     with open(
-    f"log/baseline1_{rounds}_{formatted_time}.json",
+    f"log/baseline2_{rounds}_{formatted_time}.json",
     "w",
     encoding="utf8"
     ) as f:

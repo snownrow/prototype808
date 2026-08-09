@@ -181,7 +181,7 @@ def main():
 
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    print(f"\n👦 GM-第0步\n{teacher_resp}\n")
+    #print(f"\n👦 GM-第0步\n{teacher_resp}\n")
 
     student_topic = (
         "你是一名模擬遊戲玩家。\n\n"
