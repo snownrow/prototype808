@@ -63,14 +63,14 @@ def main():
 
     j2 = {
         "電力": {
-            "每輪行動": 2,
-            "區域照明": 1,
-            "電漿焊槍": 10,
-            "發送求救信號": 5
+            "每輪行動": -2,
+            "區域照明": -1,
+            "電漿焊槍": -10,
+            "發送求救信號": -5
         },
         "氧氣": {
-            "每輪行動": 1,
-            "搜索": 2
+            "每輪行動": -1,
+            "搜索": -2
         },
         "壓力": {
             "每輪行動": 1,
@@ -80,7 +80,6 @@ def main():
     trace = []
     observer_history = []
     j3 = {
-        "每輪消耗": "一次玩家行動為一輪",
         "電力低於10": "照明關閉且無法啟動",
         "氧氣低於0": "遊戲結束",
         "電力低於0": "遊戲結束",
@@ -125,33 +124,32 @@ def main():
 
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    print(f"\n👦 GM-第0步\n{teacher_resp}\n")
+    print(f"\n👦 GameMaster-init\n{teacher_resp}\n")
 
     student_topic = (
-        "你是一名模擬遊戲玩家。\n\n"
+        "你現在是一名模擬遊戲玩家。\n\n"
         "請根據環境描述做出行動，但不要提到任何數值或狀態變化，只描述角色行動。\n\n"
         f"初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
         f"消耗規則:\n{json.dumps(j2, ensure_ascii=False)}\n\n"
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
         f"模擬引擎輸出：\n{teacher_resp}"
     )
-    trace.append({
-            "turn":0,
-            "player":student_topic,
-            "gm":teacher_topic
-        })
-    student_resp = student_chat.send(student_topic)
+    observer_init = f"遊戲開始，初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
 
-    print(f"\n👩 玩家-第1步\n{student_resp}\n")
+    #state tracking
+    state = {}
+    print("state 的型態：", type(state), "內容：", state)
+    print("j1 的型態：", type(j1), "內容：", j1)
+    
+    state["電力"] = j1["電力"]
+    state["氧氣"] = j1["氧氣"]
+    state["壓力"] = j1["壓力"]
 
-    teacher_resp = teacher_chat.send(student_resp)
-
-    print(f"\n👦 GM-第1步\n{teacher_resp}\n")
     observer_history.append({
-        #"turn":1,
-        #"player":student_resp,
-        "gm":teacher_resp
-    })
+            "turn": 0,
+            "Game Master": observer_init
+        })
+        
     pred_state = observer.extract_state(
                 json.dumps(
                     observer_history,
@@ -159,13 +157,36 @@ def main():
                 )
             )
     trace.append({
+            "turn":0,
+            "player":student_topic,
+            "GameMaster":teacher_topic
+        })
+    student_resp = student_chat.send(student_topic)
+    
+    print(f"\n👩 Player-1 turn\n{student_resp}\n")
+
+    teacher_resp = teacher_chat.send(student_resp)
+
+    print(f"\n👦 GameMaster-1 turn\n{teacher_resp}\n")
+    observer_history.append({
+        "turn": 1,
+        "Game Master": teacher_resp
+    })
+    
+    pred_state = observer.extract_state(
+                json.dumps(
+                    observer_history,
+                    ensure_ascii=False
+                )
+            )
+    #pred_state = observer.extract_state(observer_input)
+    trace.append({
         "turn":1,
         "player":student_resp,
-        "gm":teacher_resp,
-        "pred_state":pred_state
+        "GameMaster":teacher_resp,
+        "observer":pred_state
     })
     rounds = 1
-    
     
     for i in range(2, rounds + 2):
         
@@ -173,28 +194,23 @@ def main():
             teacher_resp
         )
 
-        print(f"\n玩家{i}")
+        
+        state["電力"] -= 2
+        state["氧氣"] -= 1
+        state["壓力"] += 1
+
+        student_resp = "\n\n 根據觀察者的紀錄，上一次玩家行動後的狀態是:\n" + json.dumps(state, ensure_ascii=False) + "\n\n" + student_resp
+        print(f"\nPlayer-{i} turn")
         print(student_resp)
         teacher_resp = teacher_chat.send(
             student_resp
         )
-        print(f"\n👦 GM-{i}")
+        print(f"\n👦 GameMaster-{i} turn")
         print(teacher_resp)
-        # observer_history.append(
-        #     {
-        #         "turn": i,
-        #         "player": student_resp,
-        #         "gm": teacher_resp
-        #     }
-        # )
         
-        # observer_input = json.dumps(
-        #     observer_history,
-        #     ensure_ascii=False
-        # )
         observer_input = {
-            "turn": i,
-            "gm": teacher_resp
+            "Turn": i,
+            "Game Master": teacher_resp
         }
         
         pred_state = observer.extract_state(observer_input)
@@ -203,8 +219,8 @@ def main():
         trace.append({
             "turn": i,
             "player": student_resp,
-            "gm": teacher_resp,
-            "pred_state": pred_state
+            "GameMaster": teacher_resp,
+            "observer": pred_state
         })
 
         time.sleep(1)
@@ -218,7 +234,7 @@ def main():
         final_query
     )
 
-    print("\n===== 最終結果 =====")
+    print("\n===== final result =====")
     print(final_resp)
     trace.append({
         "turn":"final",

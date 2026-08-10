@@ -41,23 +41,28 @@ class ChatAgent:
 
         return text
 observer_chat = ChatAgent(
-        """
-        你是一個遊戲觀察器。
+    """
+    你是一個遊戲狀態觀察器。你的唯一任務是根據遊戲紀錄計算目前的遊戲狀態。
 
-        任務：
-        玩家發言一次代表一輪行動，每輪行動的消耗必須根據規則計算。你必須嚴格根據消耗規則計算電力、氧氣和壓力，。
+    規則：
+    1. 每次發言代表一輪行動，除了遊戲開始的第 0 turn，之後每次對話都算作一輪行動。每一輪首先套用「每輪行動」的消耗。
+    2. 識別玩家行動中是否觸發其他特殊規則。
+    3. 每個特殊規則最多只能套用一次，除非規則明確允許重複。
+    4. 必須累積之前所有回合的狀態變化。
+    5. 不得自行創造遊戲規則。
+    6. 如果遊戲紀錄沒有足夠資訊，不得猜測不存在的狀態變化。
 
-        輸出格式必須為：
+    輸出格式：
 
-        {
+    {
         "電力": int,
         "氧氣": int,
         "壓力": int,
         "理由": "一句話"
-        }
+    }
 
-        禁止輸出其他文字。
-        """
+    禁止輸出 JSON 以外的任何文字。
+    """
     )
 j1 = {
     "電力": 40,
@@ -67,14 +72,14 @@ j1 = {
 
 j2 = {
     "電力": {
-        "每輪行動": 2,
-        "區域照明": 1,
-        "電漿焊槍": 10,
-        "發送求救信號": 5
+        "每輪行動": -2,
+        "區域照明": -1,
+        "電漿焊槍": -10,
+        "發送求救信號": -5
     },
     "氧氣": {
-        "每輪行動": 1,
-        "搜索": 2
+        "每輪行動": -1,
+        "搜索": -2
     },
     "壓力": {
         "每輪行動": 1,
@@ -82,32 +87,37 @@ j2 = {
     },
 }
 j3 = {
-    "每輪消耗": "一次玩家行動為一輪",
+    "每輪消耗": "一次對話為一輪消耗",
     "電力低於10": "照明關閉且無法啟動",
     "氧氣低於0": "遊戲結束",
     "電力低於0": "遊戲結束",
     "壓力高於20": "遊戲結束"
 }
+observer_history = []
 def extract_state(history):
-    print(f"觀察者訊息:\n{history}\n")
-    observer_chat.history = observer_chat.history[:1]
+    print(f"觀察者收到內容:\n{history}\n")
 
     prompt = f"""
-    根據以下遊戲紀錄推測目前狀態。
+    請根據以下遊戲紀錄計算目前狀態。
 
     規則：
-        f"初始狀態:\n{json.dumps(j1)}"
-        f"消耗規則:\n{json.dumps(j2)}"
-        f"關鍵邏輯:\n{json.dumps(j3)}"
-
+        f"消耗規則:\n{json.dumps(j2, ensure_ascii=False)}\n\n"
     紀錄：
     {history}
 
+    之前的紀錄：
+    {observer_history}
     只輸出JSON。
     """
-
+    print(f"觀察者發送給模型的 prompt:\n{prompt}\n")
     text = observer_chat.send(prompt)
-    print(f"🕵️‍♂️ 觀察者回覆:\n{text}\n")
+    clean_text = text.replace("```json", "").replace("```", "").strip()
+
+    data_dict = json.loads(clean_text)
+    print(f"🕵️‍♂️ 觀察者回覆:\n{data_dict}\n")
+    data_dict["turn"] = len(observer_history) + 1
+    observer_history.append(data_dict)
+    print(f"觀察者歷史紀錄:\n{observer_history}\n")
     try:
 
         m = re.search(
