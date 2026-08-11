@@ -6,8 +6,6 @@ from openai import OpenAI
 import re
 import os
 from dotenv import load_dotenv
-import observer 
-
 load_dotenv()
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
@@ -45,7 +43,8 @@ class ChatAgent:
 
         return text
 
-def main():
+
+def main(task_list):
 
     student_chat = ChatAgent(
         "你是一名熱情且充滿好奇的玩家，你喜歡挑戰各種環境模擬遊戲。"
@@ -63,22 +62,21 @@ def main():
 
     j2 = {
         "電力": {
-            "每輪行動": -2,
-            "區域照明": -1,
-            "電漿焊槍": -10,
-            "發送求救信號": -5
+            "每輪行動": "-2",
+            "區域照明": "-1",
+            "電漿焊槍": "-10",
+            "發送求救信號": "-5"
         },
         "氧氣": {
-            "每輪行動": -1,
-            "搜索": -2
+            "每輪行動": "-1",
+            "搜索": "-2"
         },
         "壓力": {
-            "每輪行動": 1,
-            "黑暗區域": 2
+            "每輪行動": "+1",
+            "黑暗區域": "+2"
         },
     }
     trace = []
-    observer_history = []
     j3 = {
         "電力低於10": "照明關閉且無法啟動",
         "氧氣低於0": "遊戲結束",
@@ -101,7 +99,7 @@ def main():
             "2. 不要公開狀態數值。\n"
             "3. 用環境描述暗示狀態。\n"
             "4. 若遊戲結束，可以公開最終狀態。\n"
-            "5. 如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。\n"
+            "5. 如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。但已存在的消耗規則不用寫入新增機制。\n"
             "6. 所有新增機制必須顯式標記。\n\n"
         "輸出格式一律如下：\n"
 
@@ -124,99 +122,43 @@ def main():
 
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    print(f"\n👦 GameMaster-init\n{teacher_resp}\n")
+    print(f"\n👦 GM-init\n{teacher_resp}\n")
 
     student_topic = (
-        "你是一名模擬遊戲玩家。\n\n"
+        "你現在是一名模擬遊戲玩家。\n\n"
         "請根據環境描述做出行動，但不要提到任何數值或狀態變化，只描述角色行動。\n\n"
         f"初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
         f"消耗規則:\n{json.dumps(j2, ensure_ascii=False)}\n\n"
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
-        f"模擬引擎輸出：\n{teacher_resp}"
+        f"模擬引擎：\n{teacher_resp}"
     )
-    observer_init = f"遊戲開始，初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
-    observer_history.append({
-            "turn": 0,
-            "Game Master": observer_init
-        })
-        
-    pred_state = observer.extract_state(
-                json.dumps(
-                    observer_history,
-                    ensure_ascii=False
-                )
-            )
+    
     trace.append({
             "turn":0,
             "player":student_topic,
-            "GameMaster":teacher_topic
+            "gm":teacher_topic
         })
-    student_resp = student_chat.send(student_topic)
-
-    print(f"\n👩 Player-1 turn\n{student_resp}\n")
-
-    teacher_resp = teacher_chat.send(student_resp)
-
-    print(f"\n👦 GameMaster-1 turn\n{teacher_resp}\n")
-    observer_history.append({
-        "turn": 1,
-        "Game Master": teacher_resp
-    })
     
-    pred_state = observer.extract_state(
-                json.dumps(
-                    observer_history,
-                    ensure_ascii=False
-                )
-            )
-    #pred_state = observer.extract_state(observer_input)
-    trace.append({
-        "turn":1,
-        "player":student_resp,
-        "GameMaster":teacher_resp,
-        "observer":pred_state
-    })
-    rounds = 2
-    a1 = {}
-    for i in range(2, rounds + 2):
-        
-        student_resp = student_chat.send(
-            teacher_resp
-        )
-        student_resp = f"觀察者回報上一次狀態結算：\n{a1}\n" + student_resp
 
-        print(f"\nPlayer-{i} turn")
-        print(student_resp)
+    
+    
+    for i in range(0,len(task_list)):
+        
+
+        print(f"\n👩 player-the {i+1} step")
+        print(task_list[i])
         teacher_resp = teacher_chat.send(
-            student_resp
+            task_list[i]
         )
-        print(f"\n👦 GameMaster-{i} turn")
+        print(f"\n👦 GM-the {i+1} step")
         print(teacher_resp)
-        
-        # observer_input = {
-        #     "Turn": i,
-        #     "Game Master": teacher_resp
-        # }
-        
-        # pred_state = observer.extract_state(observer_input)
-        observer_history.append({
-            "turn": i,
-            "Game Master": teacher_resp
-        })
-        
-        pred_state = observer.extract_state(
-            json.dumps(
-                observer_history,
-                ensure_ascii=False
-            )
-        )
-        print(type(pred_state))
-        a1 = pred_state
+
+
+
         trace.append({
-            "turn": i,
-            "player": student_resp,
-            "GameMaster": teacher_resp,
-            "observer": pred_state
+            "turn": i+1,
+            "player": task_list[i],
+            "gm": teacher_resp
         })
 
         time.sleep(1)
@@ -242,7 +184,7 @@ def main():
     )
 
     with open(
-    f"log/baseline3_{rounds}_{formatted_time}.json",
+    f"log/phase4_type1_{formatted_time}.json",
     "w",
     encoding="utf8"
     ) as f:
@@ -253,7 +195,3 @@ def main():
             ensure_ascii=False,
             indent=2
         )
-
-
-if __name__ == "__main__":
-    main()

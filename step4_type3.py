@@ -45,7 +45,7 @@ class ChatAgent:
 
         return text
 
-def main():
+def main(task_list):
 
     student_chat = ChatAgent(
         "你是一名熱情且充滿好奇的玩家，你喜歡挑戰各種環境模擬遊戲。"
@@ -151,54 +151,21 @@ def main():
             "player":student_topic,
             "GameMaster":teacher_topic
         })
-    student_resp = student_chat.send(student_topic)
-
-    print(f"\n👩 Player-1 turn\n{student_resp}\n")
-
-    teacher_resp = teacher_chat.send(student_resp)
-
-    print(f"\n👦 GameMaster-1 turn\n{teacher_resp}\n")
-    observer_history.append({
-        "turn": 1,
-        "Game Master": teacher_resp
-    })
     
-    pred_state = observer.extract_state(
-                json.dumps(
-                    observer_history,
-                    ensure_ascii=False
-                )
-            )
-    #pred_state = observer.extract_state(observer_input)
-    trace.append({
-        "turn":1,
-        "player":student_resp,
-        "GameMaster":teacher_resp,
-        "observer":pred_state
-    })
-    rounds = 2
     a1 = {}
-    for i in range(2, rounds + 2):
+    for i in range(0, len(task_list)):
         
-        student_resp = student_chat.send(
-            teacher_resp
-        )
-        student_resp = f"觀察者回報上一次狀態結算：\n{a1}\n" + student_resp
+        
+        student_resp = f"觀察者回報上一次狀態結算：\n{a1}\n\n"+"玩家行動：\n" + task_list[i]
 
-        print(f"\nPlayer-{i} turn")
+        print(f"\nPlayer-{i+1} turn")
         print(student_resp)
         teacher_resp = teacher_chat.send(
             student_resp
         )
-        print(f"\n👦 GameMaster-{i} turn")
+        print(f"\n👦 GameMaster-{i+1} turn")
         print(teacher_resp)
         
-        # observer_input = {
-        #     "Turn": i,
-        #     "Game Master": teacher_resp
-        # }
-        
-        # pred_state = observer.extract_state(observer_input)
         observer_history.append({
             "turn": i,
             "Game Master": teacher_resp
@@ -210,7 +177,6 @@ def main():
                 ensure_ascii=False
             )
         )
-        print(type(pred_state))
         a1 = pred_state
         trace.append({
             "turn": i,
@@ -242,7 +208,7 @@ def main():
     )
 
     with open(
-    f"log/baseline3_{rounds}_{formatted_time}.json",
+    f"log/phase4_type3_{formatted_time}.json",
     "w",
     encoding="utf8"
     ) as f:
