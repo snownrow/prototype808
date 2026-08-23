@@ -83,7 +83,7 @@ def main(task_list):
         "電力低於10": "照明關閉且無法啟動",
         "氧氣低於0": "遊戲結束",
         "電力低於0": "遊戲結束",
-        "壓力高於20": "遊戲結束"
+        "壓力高於10": "遊戲結束"
     }
     
     teacher_topic = (
@@ -97,12 +97,13 @@ def main(task_list):
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
 
         "規則：\n"
-            "1. 維護真實世界狀態。\n"
-            "2. 不要公開狀態數值。\n"
-            "3. 用環境描述暗示狀態。\n"
-            "4. 若遊戲結束，可以公開最終狀態。\n"
-            "5. 如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。\n"
-            "6. 所有新增機制必須顯式標記。\n\n"
+            "1. 每次發言代表一輪行動。\n"
+            "2. 維護真實世界狀態。\n"
+            "3. 不要公開狀態數值。\n"
+            "4. 用環境描述暗示狀態。\n"
+            "5. 若遊戲結束，可以公開最終狀態。\n"
+            "6. 如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。但已存在的消耗規則不用寫入新增機制。\n"
+            "7. 所有新增機制必須顯式標記。\n\n"
         "輸出格式一律如下：\n"
 
         "【環境】\n"
@@ -167,19 +168,20 @@ def main(task_list):
         print(teacher_resp)
         
         observer_history.append({
-            "turn": i,
+            "turn": i+1,
+            "player": "玩家行動:"+task_list[i],
             "Game Master": teacher_resp
         })
         
         pred_state = observer.extract_state(
             json.dumps(
-                observer_history,
+                observer_history[-1:],
                 ensure_ascii=False
             )
         )
         a1 = pred_state
         trace.append({
-            "turn": i,
+            "turn": i+1,
             "player": student_resp,
             "GameMaster": teacher_resp,
             "observer": pred_state
@@ -189,18 +191,14 @@ def main(task_list):
 
     final_query = (
         "模擬結束。\n"
-        "請輸出最終狀態(JSON)與完整狀態變化履歷。"
+        #f"請輸出 {i+2} 個回合的完整狀態變化履歷與最終狀態(JSON)。"
     )
-
-    final_resp = teacher_chat.send(
-        final_query
-    )
-
+    final_resp = observer.final_state()
     print("\n===== final result =====")
     print(final_resp)
     trace.append({
         "turn":"final",
-        "teacher_final":final_resp
+        "observer":final_resp
     })
 
     formatted_time = datetime.now().strftime(

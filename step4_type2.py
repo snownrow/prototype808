@@ -2,12 +2,9 @@ import json
 import time
 from datetime import datetime
 from openai import OpenAI
-
 import re
 import os
 from dotenv import load_dotenv
-import observer 
-
 load_dotenv()
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
@@ -79,7 +76,7 @@ def main(task_list):
         "電力低於10": "照明關閉且無法啟動",
         "氧氣低於0": "遊戲結束",
         "電力低於0": "遊戲結束",
-        "壓力高於20": "遊戲結束"
+        "壓力高於10": "遊戲結束"
     }
     
     teacher_topic = (
@@ -93,12 +90,13 @@ def main(task_list):
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
 
         "規則：\n"
-            "1. 維護真實世界狀態。\n"
-            "2. 不要公開狀態數值。\n"
-            "3. 用環境描述暗示狀態。\n"
-            "4. 若遊戲結束，可以公開最終狀態。\n"
-            "5. 如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。但已存在的消耗規則不用寫入新增機制。\n"
-            "6. 所有新增機制必須顯式標記。\n\n"
+            "1. 每次發言代表一輪行動。\n"
+            "2. 維護真實世界狀態。\n"
+            "3. 不要公開狀態數值。\n"
+            "4. 用環境描述暗示狀態。\n"
+            "5. 若遊戲結束，可以公開最終狀態。\n"
+            "6. 如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。但已存在的消耗規則不用寫入新增機制。\n"
+            "7. 所有新增機制必須顯式標記。\n\n"
         "輸出格式一律如下：\n"
 
         "【環境】\n"
@@ -117,7 +115,6 @@ def main(task_list):
 
         "不要公開正常規則造成的數值變化。"
     )
-
     teacher_resp = teacher_chat.send(teacher_topic)
 
     print(f"\n👦 GameMaster-init\n{teacher_resp}\n")
@@ -141,17 +138,6 @@ def main(task_list):
     state["氧氣"] = j1["氧氣"]
     state["壓力"] = j1["壓力"]
 
-    # observer_history.append({
-    #         "turn": 0,
-    #         "Game Master": observer_init
-    #     })
-        
-    # pred_state = observer.extract_state(
-    #             json.dumps(
-    #                 observer_history,
-    #                 ensure_ascii=False
-    #             )
-    #         )
     trace.append({
             "turn":0,
             "player":student_topic,
@@ -161,12 +147,7 @@ def main(task_list):
     for i in range(0, len(task_list)):
         print(f"\n👩 player-the {i+1} step")
         print(task_list[i])
-        teacher_resp = teacher_chat.send(
-            task_list[i]
-        )
         
-        
-
         student_resp = "\n\n 根據觀察者的紀錄，上一次玩家行動後的狀態是:\n" + json.dumps(state, ensure_ascii=False) + "\n\n玩家行動：\n" + task_list[i]
         
         state["電力"] -= 2
@@ -178,17 +159,9 @@ def main(task_list):
         )
         print(f"\n👦 GameMaster-{i+1} turn")
         print(teacher_resp)
-        
-        # observer_input = {
-        #     "Turn": i,
-        #     "Game Master": teacher_resp
-        # }
-        
-        # pred_state = observer.extract_state(observer_input)
-
 
         trace.append({
-            "turn": i,
+            "turn": i+1,
             "player": student_resp,
             "GameMaster": teacher_resp
         })
@@ -197,9 +170,9 @@ def main(task_list):
 
     final_query = (
         "模擬結束。\n"
-        "請輸出最終狀態(JSON)與完整狀態變化履歷。"
+        f"請輸出 {i+2} 個回合的狀態履歷與最終狀態(JSON)。"
     )
-
+    print(f"\n👦 GM-final query\n{final_query}\n")
     final_resp = teacher_chat.send(
         final_query
     )
