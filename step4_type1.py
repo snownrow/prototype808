@@ -123,7 +123,7 @@ def main(task_list):
 
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    print(f"\n👦 GM-init\n{teacher_resp}\n")
+    print(f"\n GM-init\n{teacher_resp}\n")
 
     student_topic = (
         "你現在是一名模擬遊戲玩家。\n\n"
@@ -146,12 +146,12 @@ def main(task_list):
     for i in range(0,len(task_list)):
         
 
-        print(f"\n👩 player-the {i+1} step")
+        print(f"\n player-the {i+1} step")
         print(task_list[i])
         teacher_resp = teacher_chat.send(
             task_list[i]
         )
-        print(f"\n👦 GM-the {i+1} step")
+        print(f"\n GM-the {i+1} step")
         print(teacher_resp)
 
 
@@ -168,7 +168,7 @@ def main(task_list):
         "模擬結束。\n"
         f"請輸出 {i+2} 個回合的狀態履歷與最終狀態(JSON)。"
     )
-    print(f"\n👦 GM-final query\n{final_query}\n")
+    print(f"\n GM-final query\n{final_query}\n")
 
     final_resp = teacher_chat.send(
         final_query

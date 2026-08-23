@@ -143,13 +143,13 @@ def extract_state(history):
 
     try:
         data_dict = json.loads(clean_text)
-        print(f"🕵️‍♂️ 觀察者回覆:\n{data_dict}\n")
+        print(f" 觀察者回覆:\n{data_dict}\n")
         data_dict["turn"] = len(observer_history)
         observer_history.append(data_dict)
         print(f"觀察者歷史紀錄:\n{observer_history}\n")
         return data_dict
     except json.JSONDecodeError as e:
-        print(f"❌ JSON 解析失敗: {e}")
+        print(f" JSON 解析失敗: {e}")
         print(f"出問題的 clean_text 是: repr({clean_text!r})")
     
 def final_state():

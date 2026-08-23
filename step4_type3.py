@@ -125,7 +125,7 @@ def main(task_list):
 
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    print(f"\n👦 GameMaster-init\n{teacher_resp}\n")
+    print(f"\n GameMaster-init\n{teacher_resp}\n")
 
     student_topic = (
         "你是一名模擬遊戲玩家。\n\n"
@@ -164,7 +164,7 @@ def main(task_list):
         teacher_resp = teacher_chat.send(
             student_resp
         )
-        print(f"\n👦 GameMaster-{i+1} turn")
+        print(f"\n GameMaster-{i+1} turn")
         print(teacher_resp)
         
         observer_history.append({

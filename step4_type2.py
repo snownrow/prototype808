@@ -117,7 +117,7 @@ def main(task_list):
     )
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    print(f"\n👦 GameMaster-init\n{teacher_resp}\n")
+    print(f"\n GameMaster-init\n{teacher_resp}\n")
 
     student_topic = (
         "你現在是一名模擬遊戲玩家。\n\n"
@@ -145,7 +145,7 @@ def main(task_list):
         })
     
     for i in range(0, len(task_list)):
-        print(f"\n👩 player-the {i+1} step")
+        print(f"\n player-the {i+1} step")
         print(task_list[i])
         
         student_resp = "\n\n 根據觀察者的紀錄，上一次玩家行動後的狀態是:\n" + json.dumps(state, ensure_ascii=False) + "\n\n玩家行動：\n" + task_list[i]
@@ -157,7 +157,7 @@ def main(task_list):
         teacher_resp = teacher_chat.send(
             student_resp
         )
-        print(f"\n👦 GameMaster-{i+1} turn")
+        print(f"\n GameMaster-{i+1} turn")
         print(teacher_resp)
 
         trace.append({
@@ -172,7 +172,7 @@ def main(task_list):
         "模擬結束。\n"
         f"請輸出 {i+2} 個回合的狀態履歷與最終狀態(JSON)。"
     )
-    print(f"\n👦 GM-final query\n{final_query}\n")
+    print(f"\n GM-final query\n{final_query}\n")
     final_resp = teacher_chat.send(
         final_query
     )

@@ -53,7 +53,7 @@ def save_history(history, filename):
             indent=2
         )
 
-    print(f"✅ 已儲存紀錄至: {filename}")
+    print(f" log saved: {filename}")
 
 
 def main():
@@ -181,7 +181,6 @@ def main():
 
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    #print(f"\n👦 GM-第0步\n{teacher_resp}\n")
 
     student_topic = (
         "你是一名模擬遊戲玩家。\n\n"
@@ -199,11 +198,11 @@ def main():
         })
     #student_resp = student_chat.send(student_topic)
     student_resp = input("請輸入玩家行動：\n")
-    #print(f"\n👩 玩家-第1步\n{student_resp}\n")
+    #print(f"\n 玩家-第1步\n{student_resp}\n")
 
     teacher_resp = teacher_chat.send(student_resp)
 
-    print(f"\n👦 GM-第1步\n{teacher_resp}\n")
+    print(f"\n GM-第1步\n{teacher_resp}\n")
     observer_history.append({
         "turn":1,
         "player":student_resp,
@@ -226,7 +225,7 @@ def main():
         teacher_resp = teacher_chat.send(
             student_resp
         )
-        print(f"\n👦 GM-{i}")
+        print(f"\n GM-{i}")
         print(teacher_resp)
 
 
