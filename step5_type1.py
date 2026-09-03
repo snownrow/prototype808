@@ -6,6 +6,9 @@ from openai import OpenAI
 import re
 import os
 from dotenv import load_dotenv
+import step5_kg
+import observer
+
 load_dotenv()
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
@@ -44,7 +47,7 @@ class ChatAgent:
         return text
 
 
-def main(task_list):
+def main():
 
     student_chat = ChatAgent(
         "你是一名熱情且充滿好奇的玩家，你喜歡挑戰各種環境模擬遊戲。"
@@ -55,8 +58,8 @@ def main(task_list):
     )
    
     j1 = {
-        "電力": 100,
-        "氧氣": 40,
+        "電力": 40,
+        "氧氣": 20,
         "壓力": 0
     }
 
@@ -81,7 +84,7 @@ def main(task_list):
         "電力低於10": "照明關閉且無法啟動",
         "氧氣低於0": "遊戲結束",
         "電力低於0": "遊戲結束",
-        "壓力高於40": "遊戲結束"
+        "壓力高於10": "遊戲結束"
     }
     
     teacher_topic = (
@@ -101,8 +104,7 @@ def main(task_list):
             "4. 用環境描述暗示狀態。\n"
             "5. 若遊戲結束，可以公開最終狀態。\n"
             "6. 如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。但已存在的消耗規則不用寫入新增機制。\n"
-            "7. 所有新增機制必須顯式標記。\n"
-            "8. 如果遊戲結束，必須在輸出的最後加入【遊戲結束】。\n\n"
+            "7. 所有新增機制必須顯式標記。\n\n"
         "輸出格式一律如下：\n"
 
         "【環境】\n"
@@ -134,74 +136,93 @@ def main(task_list):
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
         f"模擬引擎：\n{teacher_resp}"
     )
-    
+    observer_history = []
     trace.append({
             "turn":0,
             "player":student_topic,
             "gm":teacher_topic
         })
+    print(type(teacher_topic))
+    observer_init = f"遊戲開始，初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
+    observer_history.append({
+                "turn": 0,
+                "Game Master": observer_init
+            })
+    knowledgep = step5_kg.extract_state(teacher_resp)
+    obp = observer.extract_state(observer_history)
+    print(f"knowledgep:\n{knowledgep}\n")
+    #{'環境': {'位置': '昏暗的廢棄宇宙礦站', '特徵': ['破舊的設備', '空蕩蕩的倉庫', '微弱的燈光', '損壞的照明設備', '機油與塵埃的味道', '氧氣稀薄'], '聲音': ['低沉的嗡嗡聲', '金屬的迴響'], '感知': {'壓力': '來自四面八方', '身體狀態': '緊繃感', '潛在威脅': '存在'}, '行動建議': '謹慎行動，避免潛在後果'}, '新增規則': [], 'turn': 0}
+    print(f"現在狀態:\n{obp}\n")
+    #{'電力': 40, '氧氣': 20, '壓力': 0, '本輪應用規則': [{'規則名稱': '無', '狀態變化': {'電力': 0, '氧氣': 0, '壓力': 0}}], '本輪新增規則': ['無'], 'turn': 0}
+    stste_now = ['電力', '氧氣', '壓力']
+    new_dict = {k: obp[k] for k in stste_now if k in obp}
+    player1 = f"【當前狀態】\n{new_dict}\n\n【動態知識圖】\n{knowledgep}\n\n【玩家行動】\n打開手電筒照明，搜索周圍環境，尋找任何有用的物品或線索。\n"
+    print(f"player1:\n{player1}\n")
+    teacher_resp = teacher_chat.send(player1)
+    print(f"\n GM-the 1 step\n{teacher_resp}\n")
+    
+    
+    
     
 
     
-    game_over_turn = len(task_list)
-    for i in range(0,len(task_list)):
+    
+    # for i in range(0,len(task_list)):
         
 
-        print(f"\n player-the {i+1} step")
-        print(task_list[i])
-        teacher_resp = teacher_chat.send(
-            task_list[i]
-        )
-        print(f"\n GM-the {i+1} step")
-        print(teacher_resp)
+    #     print(f"\n player-the {i+1} step")
+    #     print(task_list[i])
+    #     teacher_resp = teacher_chat.send(
+    #         task_list[i]
+    #     )
+    #     print(f"\n GM-the {i+1} step")
+    #     print(teacher_resp)
 
 
 
-        trace.append({
-            "turn": i+1,
-            "player": task_list[i],
-            "gm": teacher_resp
-        })
-        if "【遊戲結束】" in teacher_resp:
-            print("\n===== GAME OVER =====")
-            game_over = True
-            game_over_turn = i + 1
-            break
-        time.sleep(1)
+    #     trace.append({
+    #         "turn": i+1,
+    #         "player": task_list[i],
+    #         "gm": teacher_resp
+    #     })
 
-    print(f"\n遊戲在第 {game_over_turn} 回合結束。")
+    #     time.sleep(1)
 
-    final_query = (
-        "遊戲已經結束。\n"
-        f"請輸出截至第 {game_over_turn} 回合的"
-        "具體狀態履歷與最終狀態(JSON)。"
-    )
-    print(f"\n GM-final query\n{final_query}\n")
+    # final_query = (
+    #     "模擬結束。\n"
+    #     f"請輸出 {i+2} 個回合的狀態履歷與最終狀態(JSON)。"
+    # )
+    # print(f"\n GM-final query\n{final_query}\n")
 
-    final_resp = teacher_chat.send(
-        final_query
-    )
+    # final_resp = teacher_chat.send(
+    #     final_query
+    # )
 
-    print("\n===== final result =====")
-    print(final_resp)
-    trace.append({
-        "turn":"final",
-        "teacher_final":final_resp
-    })
+    # print("\n===== final result =====")
+    # print(final_resp)
+    # trace.append({
+    #     "turn":"final",
+    #     "teacher_final":final_resp
+    # })
 
-    formatted_time = datetime.now().strftime(
-        "%Y-%m-%d-%H-%M-%S"
-    )
+    # formatted_time = datetime.now().strftime(
+    #     "%Y-%m-%d-%H-%M-%S"
+    # )
 
-    with open(
-    f"log/phase4_type1_{formatted_time}.json",
-    "w",
-    encoding="utf8"
-    ) as f:
+    # with open(
+    # f"log/phase4_type1_{formatted_time}.json",
+    # "w",
+    # encoding="utf8"
+    # ) as f:
 
-        json.dump(
-            trace,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
+    #     json.dump(
+    #         trace,
+    #         f,
+    #         ensure_ascii=False,
+    #         indent=2
+    #     )
+
+
+
+print("hello world")
+main()

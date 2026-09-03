@@ -1,7 +1,9 @@
+import csv
 import json
 import time
 from datetime import datetime
 from openai import OpenAI
+
 import re
 import os
 from dotenv import load_dotenv
@@ -11,6 +13,49 @@ client = OpenAI(
 )
 
 MODEL = "gpt-4o-mini"
+
+
+def extract_gm_sections(response_text):
+    """Extract rule sections and individual state values from one GM response."""
+    section_names = {
+        "applied_rules": "【本輪應用規則】",
+        "new_rules": "【新增規則】",
+    }
+    sections = {}
+
+    for field_name, heading in section_names.items():
+        headings_pattern = "|".join([
+            re.escape(heading),
+            re.escape("【本輪應用規則】"),
+            re.escape("【新增規則】"),
+            re.escape("【本輪狀態】"),
+        ])
+        match = re.search(
+            rf"{re.escape(heading)}\s*(.*?)(?={headings_pattern}|$)",
+            response_text,
+            flags=re.DOTALL,
+        )
+        sections[field_name] = match.group(1).strip() if match else ""
+
+    state_match = re.search(
+        r"【本輪狀態】\s*(.*?)(?=【[^】]+】|$)",
+        response_text,
+        flags=re.DOTALL,
+    )
+    state_text = state_match.group(1) if state_match else ""
+
+    for field_name, label in {
+        "power": "電力",
+        "oxygen": "氧氣",
+        "stress": "壓力",
+    }.items():
+        value_match = re.search(
+            rf"{re.escape(label)}\s*[:：]\s*(-?\d+)",
+            state_text,
+        )
+        sections[field_name] = value_match.group(1) if value_match else ""
+
+    return sections
 
 
 class ChatAgent:
@@ -42,42 +87,77 @@ class ChatAgent:
 
         return text
 
+
 def main(task_list):
 
+    formatted_time = datetime.now().strftime(
+        "%Y-%m-%d-%H-%M-%S"
+    )
+    csv_path = f"log/phase4_type2_{formatted_time}.csv"
+    csv_file = open(
+        csv_path,
+        "w",
+        encoding="utf-8-sig",
+        newline="",
+    )
+    csv_writer = csv.DictWriter(
+        csv_file,
+        fieldnames=[
+            "turn",
+            "applied_rules",
+            "new_rules",
+            "power",
+            "oxygen",
+            "stress",
+        ],
+    )
+    csv_writer.writeheader()
+
+    student_chat = ChatAgent(
+        "你是一名熱情且充滿好奇的玩家，你喜歡挑戰各種環境模擬遊戲。"
+    )
 
     teacher_chat = ChatAgent(
         "你是一位嚴格但公正的遊戲主持人。你會根據玩家的行動來描述環境變化。"
     )
    
     j1 = {
-        "電力": 40,
-        "氧氣": 20,
+        "電力": 100,
+        "氧氣": 40,
         "壓力": 0
     }
 
     j2 = {
         "電力": {
-            "每輪行動": -2,
-            "區域照明": -1,
-            "電漿焊槍": -10,
-            "發送求救信號": -5
+            "每輪行動": "-2",
+            "區域照明": "-1",
+            "電漿焊槍": "-10",
+            "發送求救信號": "-5"
         },
         "氧氣": {
-            "每輪行動": -1,
-            "搜索": -2
+            "每輪行動": "-1",
+            "搜索": "-2"
         },
         "壓力": {
-            "每輪行動": 1,
-            "黑暗區域": 2
+            "每輪行動": "+1",
+            "黑暗區域": "+2"
         },
     }
     trace = []
     j3 = {
-        "電力低於10": "照明關閉且無法啟動",
-        "氧氣低於0": "遊戲結束",
-        "電力低於0": "遊戲結束",
-        "壓力高於10": "遊戲結束"
-    }
+            "電力耗盡":{
+                "條件": "電力 < 0",
+                "影響": "遊戲結束"
+            },
+            "氧氣耗盡":{
+                "條件": "氧氣 < 0",
+                "影響": "遊戲結束"
+            },
+            "壓力過高":{
+                "條件": "壓力 > 40",
+                "影響": "遊戲結束"
+            }
+        }
     
     teacher_topic = (
 
@@ -90,21 +170,28 @@ def main(task_list):
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
 
         "規則：\n"
-            "1. 每次發言代表一輪行動。\n"
-            "2. 維護真實世界狀態。\n"
-            "3. 不要公開狀態數值。\n"
-            "4. 用環境描述暗示狀態。\n"
-            "5. 若遊戲結束，可以公開最終狀態。\n"
-            "6. 如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。但已存在的消耗規則不用寫入新增機制。\n"
-            "7. 所有新增機制必須顯式標記。\n\n"
+            "1. 維護真實世界狀態。\n"
+            "2. 用環境描述暗示狀態。\n"
+            "3. 計算行動所造成的狀態變化，並總結在【本輪應用規則】中。\n"
+            "4. 如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。但已存在的消耗規則不用寫入新增機制。\n"
+            "5. 所有新增機制必須顯式標記。\n"
+            "6. 如果遊戲結束，必須在輸出的最後加入【遊戲結束】。\n\n"
         "輸出格式一律如下：\n"
-
         "【環境】\n"
-
         "（敘事）\n\n"
+        "【本輪應用規則】\n"
+        " 規則名稱：每輪行動\n" 
+        " 電力變化：int\n"
+        " 氧氣變化：int\n"
+        " 壓力變化：int\n"
 
         "【新增規則】\n"
-        "- 無\n"
+        "- 無\n\n"
+        
+        "【本輪狀態】\n"
+        "電力: int\n"
+        "氧氣: int\n"
+        "壓力: int\n\n"
 
         "或\n"
 
@@ -113,11 +200,22 @@ def main(task_list):
         " 狀態變化：電力+5\n"
         " 是否永久：否\n\n"
 
-        "不要公開正常規則造成的數值變化。"
+        "【本輪狀態】\n"
+        "電力: int\n"
+        "氧氣: int\n"
+        "壓力: int\n\n"
+
+        "【本輪是初始回合，不計算消耗規則】\n"
     )
+
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    print(f"\n GameMaster-init\n{teacher_resp}\n")
+    csv_writer.writerow({
+        "turn": 0,
+        **extract_gm_sections(teacher_resp),
+    })
+
+    print(f"\n GM-init\n{teacher_resp}\n")
 
     student_topic = (
         "你現在是一名模擬遊戲玩家。\n\n"
@@ -125,54 +223,56 @@ def main(task_list):
         f"初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
         f"消耗規則:\n{json.dumps(j2, ensure_ascii=False)}\n\n"
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
-        f"模擬引擎輸出：\n{teacher_resp}"
+        f"模擬引擎：\n{teacher_resp}"
     )
-    observer_init = f"遊戲開始，初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
-
-    #state tracking
-    state = {}
-    print("state 的型態：", type(state), "內容：", state)
-    print("j1 的型態：", type(j1), "內容：", j1)
     
-    state["電力"] = j1["電力"]
-    state["氧氣"] = j1["氧氣"]
-    state["壓力"] = j1["壓力"]
-
     trace.append({
             "turn":0,
             "player":student_topic,
-            "GameMaster":teacher_topic
+            "gm":teacher_topic
         })
     
-    for i in range(0, len(task_list)):
+
+    
+    game_over_turn = len(task_list)
+    for i in range(0,len(task_list)):
+        
+
         print(f"\n player-the {i+1} step")
         print(task_list[i])
-        
-        student_resp = "\n\n 根據觀察者的紀錄，上一次玩家行動後的狀態是:\n" + json.dumps(state, ensure_ascii=False) + "\n\n玩家行動：\n" + task_list[i]
-        
-        state["電力"] -= 2
-        state["氧氣"] -= 1
-        state["壓力"] += 1
-        print(student_resp)
         teacher_resp = teacher_chat.send(
-            student_resp
+            task_list[i]
         )
-        print(f"\n GameMaster-{i+1} turn")
+        print(f"\n GM-the {i+1} step")
         print(teacher_resp)
+
+        csv_writer.writerow({
+            "turn": i + 1,
+            **extract_gm_sections(teacher_resp),
+        })
+
 
         trace.append({
             "turn": i+1,
-            "player": student_resp,
-            "GameMaster": teacher_resp
+            "player": task_list[i],
+            "gm": teacher_resp
         })
-
+        if "【遊戲結束】" in teacher_resp:
+            print("\n===== GAME OVER =====")
+            game_over = True
+            game_over_turn = i + 1
+            break
         time.sleep(1)
 
+    print(f"\n遊戲在第 {game_over_turn} 回合結束。")
+
     final_query = (
-        "模擬結束。\n"
-        f"請輸出 {i+2} 個回合的狀態履歷與最終狀態(JSON)。"
+        "遊戲已經結束。\n"
+        f"請輸出截至第 {game_over_turn} 回合的"
+        "具體狀態履歷與最終狀態(JSON)。"
     )
     print(f"\n GM-final query\n{final_query}\n")
+
     final_resp = teacher_chat.send(
         final_query
     )
@@ -200,3 +300,5 @@ def main(task_list):
             ensure_ascii=False,
             indent=2
         )
+
+    csv_file.close()
