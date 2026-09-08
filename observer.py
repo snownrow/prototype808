@@ -56,6 +56,7 @@ observer_chat = ChatAgent(
     輸出格式如下：
     {
         "turn": int,
+        "玩家動作": string,
         "本輪應用規則": [
             {"規則名稱": string, "狀態變化": {"電力": int, "氧氣": int, "壓力": int}}
         ],

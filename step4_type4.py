@@ -16,7 +16,6 @@ client = OpenAI(
 
 MODEL = "gpt-4o-mini"
 
-
 class ChatAgent:
     def __init__(self, system_prompt):
         self.history = [
