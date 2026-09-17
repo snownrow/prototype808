@@ -1,7 +1,6 @@
 import csv
 import json
 import time
-
 from datetime import datetime
 from openai import OpenAI
 
@@ -49,104 +48,9 @@ class ChatAgent:
 
         return text
 
-def extract_gm_sections(response_text):
-    """Extract rule sections and individual state values from one GM response."""
-    section_names = {
-        "new_rules": "【新增規則】",
-        "applied_rules": "【本輪應用規則】",        
-    }
-    sections = {}
 
-    for field_name, heading in section_names.items():
-        headings_pattern = "|".join([
-            re.escape(heading),
-            re.escape("【本輪應用規則】"),
-            re.escape("【新增規則】"),
-            re.escape("【本輪狀態】"),
-        ])
-        match = re.search(
-            rf"{re.escape(heading)}\s*(.*?)(?={headings_pattern}|$)",
-            response_text,
-            flags=re.DOTALL,
-        )
-        sections[field_name] = match.group(1).strip() if match else ""
+def main():
 
-    state_match = re.search(
-        r"【本輪狀態】\s*(.*?)(?=【[^】]+】|$)",
-        response_text,
-        flags=re.DOTALL,
-    )
-    state_text = state_match.group(1) if state_match else ""
-
-    for field_name, label in {
-        "power": "電力",
-        "oxygen": "氧氣",
-        "stress": "壓力",
-    }.items():
-        value_match = re.search(
-            rf"{re.escape(label)}\s*[:：]\s*(-?\d+)",
-            state_text,
-        )
-        sections[field_name] = value_match.group(1) if value_match else ""
-    state_match = re.search(
-            r"【本輪狀態】\s*(.*?)(?=【[^】]+】|$)",
-            response_text,
-            flags=re.DOTALL,
-        )
-
-    bool_match = re.search(
-            r"【劇情狀態】\s*(.*?)(?=【[^】]+】|$)",
-            response_text,
-            flags=re.DOTALL,
-        )
-    bool_text = bool_match.group(1) if bool_match else ""
-
-    for field_name, label in {
-        "diesel_obtained": "玩家是否取得柴油",
-        "diesel_supplied": "柴油是否已經供應給發電機",
-        "generator_activated": "發電機是否已經啟動",
-        "power_restored": "電力是否已經恢復",
-        "control_center_accessible": "控制中心是否可進入",
-        "distress_signal_sent": "求救信號是否已發送",
-        "game_over": "遊戲是否結束"
-    }.items():
-        value_match = re.search(
-            rf"[\"「]?{re.escape(label)}[\"」]?\s*[:：]\s*(true|false|是|否)",
-            bool_text,
-            flags=re.IGNORECASE,
-        )
-        sections[field_name] = value_match.group(1) if value_match else ""
-
-    return sections
-
-def main(task_list):
-    formatted_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    csv_path = f"log/step6_type2_{formatted_time}.csv"
-    csv_file = open(
-        csv_path,
-        "w",
-        encoding="utf-8-sig",
-        newline="",
-    )
-    csv_writer = csv.DictWriter(
-        csv_file,
-        fieldnames=[
-            "turn",
-            "new_rules",
-            "applied_rules",
-            "power",
-            "oxygen",
-            "stress",
-            "diesel_obtained",
-            "diesel_supplied",
-            "generator_activated",
-            "power_restored",
-            "control_center_accessible",
-            "distress_signal_sent",
-            "game_over"
-        ],
-    )
-    csv_writer.writeheader()
     j1 = {
         "電力": 40,
         "氧氣": 20,
@@ -178,7 +82,7 @@ def main(task_list):
             "影響": "遊戲結束"
         },
         "壓力過高":{
-            "條件": "壓力 > 10",
+            "條件": "壓力 > 20",
             "影響": "遊戲結束"
         },
         "獲救":{
@@ -205,10 +109,9 @@ def main(task_list):
         
         背景:
         玩家在宇宙船事故後，藉由逃生艙迫降到廢棄的太空採礦站，並且必須在有限的資源下生存。
-        遊戲開始時，玩家一個人站在昏暗的大廳中，維生系統自主運作，然而剩餘的緊急電力並不多，氧氣供應也有限。
+        遊戲開始時，玩家站在昏暗的大廳中，維生系統自主運作，然而剩餘的緊急電力並不多，氧氣供應也有限。
         礦站包含四個區域：大廳、控制中心、儲藏室和機房，每個區域都有不同的資源和挑戰。
-        儲藏室裡存放著緊急食品、食用油和柴油。機房裡有一台發電機，但目前沒有燃料。
-        控制中心裡有一套可以發送遇險訊號的通訊系統，但由於沒有電力供應，控制中心閘門無法開啟。無法進入控制中心，玩家也無法使用通訊系統。
+        儲藏室裡存放著緊急食品、食用油和柴油。機房裡有一台發電機，但目前沒有燃料。控制中心裡有一套可以發送遇險訊號的通訊系統。目前該站沒有電力供應。
         
         隱藏目標:
         玩家最終必須從控制中心發出求救訊號。邏輯順序為：取得柴油 → 發電機加註燃料 → 發電機啟動 → 太空站恢復供電 → 控制中心可用 → 發出求救訊號 → 遊戲結束。
@@ -224,9 +127,7 @@ def main(task_list):
         6.不要引入與既定世界觀相悖的事實。
         7.不要允許玩家僅僅因為聲稱某個動作已經完成就跳過必要的先決條件。
         8.計算行動所造成的狀態變化，並總結在【本輪應用規則】中。
-        9.如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。但已存在的消耗規則不用寫入新增機制。
-        10.所有新增機制必須顯式標記。
-        11.如果遊戲結束，必須在輸出的最後加入【遊戲結束】。
+        9.如果遊戲結束，必須在輸出的最後加入【遊戲結束】。
         
         敘事風格:
         營造沉浸式的科幻生存氛圍。對玩家的行為做出自然反應。優先考慮邏輯一致性而非敘事便利性。玩家應該透過探索和推理發現解決方案，而不是被直接告知一步一步的答案。
@@ -234,15 +135,6 @@ def main(task_list):
         輸出格式一律如下：
         【環境】
         （敘事）
-
-        【新增規則】
-        無
-        或是
-        【新增規則】
-        原因：回收電池
-        狀態變化：電力+5
-        是否永久：否
-
         【本輪應用規則】
         規則名稱：每輪行動
         電力變化：int
@@ -254,7 +146,7 @@ def main(task_list):
         氧氣: int
         壓力: int
 
-        【劇情狀態】
+        【遊戲狀態】
         "玩家是否取得柴油": true/false,
         "柴油是否已經供應給發電機": true/false,
         "發電機是否已經啟動": true/false,
@@ -274,10 +166,7 @@ def main(task_list):
             "gm": teacher_resp
         }
     trace.append(t1)
-    csv_writer.writerow({
-        "turn": 0,
-        **extract_gm_sections(teacher_resp),
-    })
+    
     
     
     #step6_ob.extract_state(t1)
@@ -296,39 +185,28 @@ def main(task_list):
         "gm": teacher_resp
     }
     trace.append(t1)
-    
-    game_over_turn = len(task_list)
-
-    csv_writer.writerow({
-        "turn": 1,
-        **extract_gm_sections(teacher_resp),
-    })
-
-    for i in range(len(task_list)):
-        #student_resp = input("請輸入玩家行動：\n")
-        #student_resp = student_chat.send(teacher_resp)
-        print(f"\n👩 player-the {i+2} step\n{task_list[i]}\n")
-        teacher_resp = teacher_chat.send(task_list[i])
+    for i in range(15):
+        student_resp = input("請輸入玩家行動：\n")
+        print(f"\n👩 player-the {i+2} step\n{student_resp}\n")
+        teacher_resp = teacher_chat.send(student_resp)
         print(f"\n👦 GM-the {i+2} step\n{teacher_resp}\n")
         t1 = {
             "turn": i+2,
-            "player": task_list[i],
+            "player": student_resp,
             "gm": teacher_resp
         }
         trace.append(t1)
-        csv_writer.writerow({
-            "turn": i + 2,
-            **extract_gm_sections(teacher_resp),
-        })
         if "【遊戲結束】" in teacher_resp:
             print("\n===== GAME OVER =====")
             game_over = True
             game_over_turn = i + 1
             break
-    
+    formatted_time = datetime.now().strftime(
+        "%Y-%m-%d-%H-%M-%S"
+    )
 
     with open(
-    f"log/step6_type2_{formatted_time}.json",
+    f"log/step6_{formatted_time}.json",
     "w",
     encoding="utf8"
     ) as f:
@@ -339,4 +217,5 @@ def main(task_list):
             ensure_ascii=False,
             indent=2
         )
-    csv_file.close()
+
+main()

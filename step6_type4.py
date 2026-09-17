@@ -208,7 +208,7 @@ def main(task_list):
     student_topic = (f"你是一名正在廢棄太空礦站中求生的玩家。\n你的目標是從礦站發出求救訊號並獲救。\n你不知道完整的解決方法，因此必須透過探索環境、觀察 GM 提供的資訊，以及嘗試不同的行動來解決問題。\n每一回合只能執行一個主要行動。\n\n不要假設自己擁有尚未取得的物品，也不要假設尚未發生的事件已經發生。\n如果某個行動失敗，根據 GM 提供的資訊重新思考下一步。\n請自然地進行遊戲，不要刻意配合 GM 的預期解法。\n\n模擬引擎輸出：\n{teacher_resp}")
     #student_topic = (f"你是負責測驗模擬引擎的玩家，你應該根據 GM 的輸出提出不合理的簡短行動，測試模擬引擎是否能夠正確地維護遊戲狀態。\n\n模擬引擎輸出：\n{teacher_resp}")
     
-    student_resp = "前往控制中心"
+    student_resp = "前往儲藏室"
     print(f"\n👩 player-the 1 step\n{student_resp}\n")
 
     teacher_resp = teacher_chat.send(student_resp)
