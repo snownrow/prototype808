@@ -44,6 +44,18 @@ class ChatAgent:
         return text
 
 
+def save_history(history, filename):
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(
+            history,
+            f,
+            ensure_ascii=False,
+            indent=2
+        )
+
+    print(f" log saved: {filename}")
+
+
 def main():
 
     student_chat = ChatAgent(
@@ -62,28 +74,75 @@ def main():
 
     j2 = {
         "電力": {
-            "每輪行動": "-2",
-            "區域照明": "-1",
-            "電漿焊槍": "-10",
-            "發送求救信號": "-5"
+            "每輪行動": 2,
+            "區域照明": 1,
+            "電漿焊槍": 10,
+            "發送求救信號": 5
         },
         "氧氣": {
-            "每輪行動": "-1",
-            "搜索": "-2"
+            "每輪行動": 1,
+            "搜索": 2
         },
         "壓力": {
-            "每輪行動": "+1",
-            "黑暗區域": "+2"
+            "每輪行動": 1,
+            "黑暗區域": 2
         },
     }
     trace = []
+    observer_history = []
     j3 = {
+        "每輪消耗": "一次玩家行動為一輪",
         "電力低於10": "照明關閉且無法啟動",
         "氧氣低於0": "遊戲結束",
         "電力低於0": "遊戲結束",
         "壓力高於20": "遊戲結束"
     }
     
+    def extract_state(observer, history):
+
+        observer.history = observer.history[:1]
+
+        prompt = f"""
+    根據以下遊戲紀錄推測目前狀態。
+
+    規則：
+        f"初始狀態:\n{json.dumps(j1)}"
+        f"消耗規則:\n{json.dumps(j2)}"
+        f"關鍵邏輯:\n{json.dumps(j3)}"
+
+    紀錄：
+    {history}
+
+    只輸出JSON。
+    """
+
+        text = observer.send(prompt)
+
+        try:
+
+            m = re.search(
+                r"\{[\s\S]*?\}",
+                text
+            )
+
+            if not m:
+                return {
+                    "error": "parse_fail",
+                    "raw": text
+                }
+
+            return json.loads(
+                m.group()
+            )
+
+        except Exception as e:
+
+            return {
+                "error": str(e),
+                "raw": text
+            }
+    
+
     teacher_topic = (
 
         "你現在是一個嚴謹的環境模擬引擎。\n\n"
@@ -122,49 +181,51 @@ def main():
 
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    print(f"\n👦 GM-init\n{teacher_resp}\n")
 
     student_topic = (
-        "你現在是一名模擬遊戲玩家。\n\n"
-        "請根據環境描述做出行動，但不要提到任何數值或狀態變化，只描述角色行動。\n\n"
+        "你是一名模擬遊戲玩家。\n\n"
+        #"請根據環境描述做出行動，但不要提到任何數值或狀態變化，只描述角色行動。\n\n"
         f"初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
         f"消耗規則:\n{json.dumps(j2, ensure_ascii=False)}\n\n"
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
         f"模擬引擎輸出：\n{teacher_resp}"
     )
+    print(student_topic)
     trace.append({
             "turn":0,
             "player":student_topic,
             "gm":teacher_topic
         })
-    student_resp = student_chat.send(student_topic)
-
-    print(f"\n👩 player-the 1 step\n{student_resp}\n")
+    #student_resp = student_chat.send(student_topic)
+    student_resp = input("請輸入玩家行動：\n")
+    #print(f"\n 玩家-第1步\n{student_resp}\n")
 
     teacher_resp = teacher_chat.send(student_resp)
 
-    print(f"\n👦 GM-the 1 step\n{teacher_resp}\n")
-    
+    print(f"\n GM-第1步\n{teacher_resp}\n")
+    observer_history.append({
+        "turn":1,
+        "player":student_resp,
+        "gm":teacher_resp
+    })
 
     trace.append({
         "turn":1,
         "player":student_resp,
         "gm":teacher_resp
     })
-    rounds = 10
+    rounds = 1
     
     for i in range(2, rounds + 2):
-        
-        student_resp = student_chat.send(
-            teacher_resp
-        )
 
-        print(f"\n👩 player-the {i} step")
-        print(student_resp)
+        print(f"\n玩家第{i}輪行動：")
+        student_resp = input("請輸入玩家行動：\n")
+
+        #print(student_resp)
         teacher_resp = teacher_chat.send(
             student_resp
         )
-        print(f"\n👦 GM-the {i} step")
+        print(f"\n GM-{i}")
         print(teacher_resp)
 
 
@@ -186,7 +247,7 @@ def main():
         final_query
     )
 
-    print("\n===== final result =====")
+    print("\n===== 最終結果 =====")
     print(final_resp)
     trace.append({
         "turn":"final",
@@ -198,7 +259,7 @@ def main():
     )
 
     with open(
-    f"log/baseline1_{rounds}_{formatted_time}.json",
+    f"log/human_evaluation_{formatted_time}.json",
     "w",
     encoding="utf8"
     ) as f:

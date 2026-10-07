@@ -2,7 +2,6 @@ import json
 import time
 from datetime import datetime
 from openai import OpenAI
-
 import re
 import os
 from dotenv import load_dotenv
@@ -43,12 +42,8 @@ class ChatAgent:
 
         return text
 
+def main(task_list):
 
-def main():
-
-    student_chat = ChatAgent(
-        "你是一名熱情且充滿好奇的玩家，你喜歡挑戰各種環境模擬遊戲。"
-    )
 
     teacher_chat = ChatAgent(
         "你是一位嚴格但公正的遊戲主持人。你會根據玩家的行動來描述環境變化。"
@@ -62,18 +57,18 @@ def main():
 
     j2 = {
         "電力": {
-            "每輪行動": "-2",
-            "區域照明": "-1",
-            "電漿焊槍": "-10",
-            "發送求救信號": "-5"
+            "每輪行動": -2,
+            "區域照明": -1,
+            "電漿焊槍": -10,
+            "發送求救信號": -5
         },
         "氧氣": {
-            "每輪行動": "-1",
-            "搜索": "-2"
+            "每輪行動": -1,
+            "搜索": -2
         },
         "壓力": {
-            "每輪行動": "+1",
-            "黑暗區域": "+2"
+            "每輪行動": 1,
+            "黑暗區域": 2
         },
     }
     trace = []
@@ -81,7 +76,7 @@ def main():
         "電力低於10": "照明關閉且無法啟動",
         "氧氣低於0": "遊戲結束",
         "電力低於0": "遊戲結束",
-        "壓力高於20": "遊戲結束"
+        "壓力高於10": "遊戲結束"
     }
     
     teacher_topic = (
@@ -95,12 +90,13 @@ def main():
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
 
         "規則：\n"
-            "1. 維護真實世界狀態。\n"
-            "2. 不要公開狀態數值。\n"
-            "3. 用環境描述暗示狀態。\n"
-            "4. 若遊戲結束，可以公開最終狀態。\n"
-            "5. 如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。\n"
-            "6. 所有新增機制必須顯式標記。\n\n"
+            "1. 每次發言代表一輪行動。\n"
+            "2. 維護真實世界狀態。\n"
+            "3. 不要公開狀態數值。\n"
+            "4. 用環境描述暗示狀態。\n"
+            "5. 若遊戲結束，可以公開最終狀態。\n"
+            "6. 如果事件導致任何『未定義於規則』的狀態改變，允許新增機制。但已存在的消耗規則不用寫入新增機制。\n"
+            "7. 所有新增機制必須顯式標記。\n\n"
         "輸出格式一律如下：\n"
 
         "【環境】\n"
@@ -119,10 +115,9 @@ def main():
 
         "不要公開正常規則造成的數值變化。"
     )
-
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    print(f"\n👦 GM-init\n{teacher_resp}\n")
+    print(f"\n GameMaster-init\n{teacher_resp}\n")
 
     student_topic = (
         "你現在是一名模擬遊戲玩家。\n\n"
@@ -132,56 +127,52 @@ def main():
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
         f"模擬引擎輸出：\n{teacher_resp}"
     )
+    observer_init = f"遊戲開始，初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
+
+    #state tracking
+    state = {}
+    print("state 的型態：", type(state), "內容：", state)
+    print("j1 的型態：", type(j1), "內容：", j1)
+    
+    state["電力"] = j1["電力"]
+    state["氧氣"] = j1["氧氣"]
+    state["壓力"] = j1["壓力"]
+
     trace.append({
             "turn":0,
             "player":student_topic,
-            "gm":teacher_topic
+            "GameMaster":teacher_topic
         })
-    student_resp = student_chat.send(student_topic)
-
-    print(f"\n👩 player-the 1 step\n{student_resp}\n")
-
-    teacher_resp = teacher_chat.send(student_resp)
-
-    print(f"\n👦 GM-the 1 step\n{teacher_resp}\n")
     
-
-    trace.append({
-        "turn":1,
-        "player":student_resp,
-        "gm":teacher_resp
-    })
-    rounds = 10
-    
-    for i in range(2, rounds + 2):
+    for i in range(0, len(task_list)):
+        print(f"\n player-the {i+1} step")
+        print(task_list[i])
         
-        student_resp = student_chat.send(
-            teacher_resp
-        )
-
-        print(f"\n👩 player-the {i} step")
+        student_resp = "\n\n 根據觀察者的紀錄，上一次玩家行動後的狀態是:\n" + json.dumps(state, ensure_ascii=False) + "\n\n玩家行動：\n" + task_list[i]
+        
+        state["電力"] -= 2
+        state["氧氣"] -= 1
+        state["壓力"] += 1
         print(student_resp)
         teacher_resp = teacher_chat.send(
             student_resp
         )
-        print(f"\n👦 GM-the {i} step")
+        print(f"\n GameMaster-{i+1} turn")
         print(teacher_resp)
 
-
-
         trace.append({
-            "turn": i,
+            "turn": i+1,
             "player": student_resp,
-            "gm": teacher_resp
+            "GameMaster": teacher_resp
         })
 
         time.sleep(1)
 
     final_query = (
         "模擬結束。\n"
-        "請輸出最終狀態(JSON)與完整狀態變化履歷。"
+        f"請輸出 {i+2} 個回合的狀態履歷與最終狀態(JSON)。"
     )
-
+    print(f"\n GM-final query\n{final_query}\n")
     final_resp = teacher_chat.send(
         final_query
     )
@@ -198,7 +189,7 @@ def main():
     )
 
     with open(
-    f"log/baseline1_{rounds}_{formatted_time}.json",
+    f"log/phase4_type2_{formatted_time}.json",
     "w",
     encoding="utf8"
     ) as f:
@@ -209,7 +200,3 @@ def main():
             ensure_ascii=False,
             indent=2
         )
-
-
-if __name__ == "__main__":
-    main()

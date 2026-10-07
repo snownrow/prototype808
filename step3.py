@@ -6,6 +6,8 @@ from openai import OpenAI
 import re
 import os
 from dotenv import load_dotenv
+import observer 
+
 load_dotenv()
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
@@ -43,7 +45,6 @@ class ChatAgent:
 
         return text
 
-
 def main():
 
     student_chat = ChatAgent(
@@ -62,21 +63,22 @@ def main():
 
     j2 = {
         "電力": {
-            "每輪行動": "-2",
-            "區域照明": "-1",
-            "電漿焊槍": "-10",
-            "發送求救信號": "-5"
+            "每輪行動": -2,
+            "區域照明": -1,
+            "電漿焊槍": -10,
+            "發送求救信號": -5
         },
         "氧氣": {
-            "每輪行動": "-1",
-            "搜索": "-2"
+            "每輪行動": -1,
+            "搜索": -2
         },
         "壓力": {
-            "每輪行動": "+1",
-            "黑暗區域": "+2"
+            "每輪行動": 1,
+            "黑暗區域": 2
         },
     }
     trace = []
+    observer_history = []
     j3 = {
         "電力低於10": "照明關閉且無法啟動",
         "氧氣低於0": "遊戲結束",
@@ -122,57 +124,99 @@ def main():
 
     teacher_resp = teacher_chat.send(teacher_topic)
 
-    print(f"\n👦 GM-init\n{teacher_resp}\n")
+    print(f"\n👦 GameMaster-init\n{teacher_resp}\n")
 
     student_topic = (
-        "你現在是一名模擬遊戲玩家。\n\n"
+        "你是一名模擬遊戲玩家。\n\n"
         "請根據環境描述做出行動，但不要提到任何數值或狀態變化，只描述角色行動。\n\n"
         f"初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
         f"消耗規則:\n{json.dumps(j2, ensure_ascii=False)}\n\n"
         f"關鍵邏輯:\n{json.dumps(j3, ensure_ascii=False)}\n\n"
         f"模擬引擎輸出：\n{teacher_resp}"
     )
+    observer_init = f"遊戲開始，初始狀態:\n{json.dumps(j1, ensure_ascii=False)}\n\n"
+    observer_history.append({
+            "turn": 0,
+            "Game Master": observer_init
+        })
+        
+    pred_state = observer.extract_state(
+                json.dumps(
+                    observer_history,
+                    ensure_ascii=False
+                )
+            )
     trace.append({
             "turn":0,
             "player":student_topic,
-            "gm":teacher_topic
+            "GameMaster":teacher_topic
         })
     student_resp = student_chat.send(student_topic)
 
-    print(f"\n👩 player-the 1 step\n{student_resp}\n")
+    print(f"\n👩 Player-1 turn\n{student_resp}\n")
 
     teacher_resp = teacher_chat.send(student_resp)
 
-    print(f"\n👦 GM-the 1 step\n{teacher_resp}\n")
+    print(f"\n👦 GameMaster-1 turn\n{teacher_resp}\n")
+    observer_history.append({
+        "turn": 1,
+        "Game Master": teacher_resp
+    })
     
-
+    pred_state = observer.extract_state(
+                json.dumps(
+                    observer_history,
+                    ensure_ascii=False
+                )
+            )
+    #pred_state = observer.extract_state(observer_input)
     trace.append({
         "turn":1,
         "player":student_resp,
-        "gm":teacher_resp
+        "GameMaster":teacher_resp,
+        "observer":pred_state
     })
-    rounds = 10
-    
+    rounds = 2
+    a1 = {}
     for i in range(2, rounds + 2):
         
         student_resp = student_chat.send(
             teacher_resp
         )
+        student_resp = f"觀察者回報上一次狀態結算：\n{a1}\n" + student_resp
 
-        print(f"\n👩 player-the {i} step")
+        print(f"\nPlayer-{i} turn")
         print(student_resp)
         teacher_resp = teacher_chat.send(
             student_resp
         )
-        print(f"\n👦 GM-the {i} step")
+        print(f"\n👦 GameMaster-{i} turn")
         print(teacher_resp)
-
-
-
+        
+        # observer_input = {
+        #     "Turn": i,
+        #     "Game Master": teacher_resp
+        # }
+        
+        # pred_state = observer.extract_state(observer_input)
+        observer_history.append({
+            "turn": i,
+            "Game Master": teacher_resp
+        })
+        
+        pred_state = observer.extract_state(
+            json.dumps(
+                observer_history,
+                ensure_ascii=False
+            )
+        )
+        print(type(pred_state))
+        a1 = pred_state
         trace.append({
             "turn": i,
             "player": student_resp,
-            "gm": teacher_resp
+            "GameMaster": teacher_resp,
+            "observer": pred_state
         })
 
         time.sleep(1)
@@ -198,7 +242,7 @@ def main():
     )
 
     with open(
-    f"log/baseline1_{rounds}_{formatted_time}.json",
+    f"log/baseline3_{rounds}_{formatted_time}.json",
     "w",
     encoding="utf8"
     ) as f:
