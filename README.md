@@ -1,4 +1,10 @@
-Causal and State-Aware Narrative Generation with Large Language Models in Interactive Role-Playing Environments 
+# Causal and State-Aware Narrative Generation with Large Language Models
 
-2.Introduction 
-Large Language Models (LLMs) have demonstrated remarkable capabilities in long-context text generation and interactive dialogue. However, despite their fluency, existing models often struggle to maintain coherent world states and causal consistency over long-horizon narratives. In extended interactions, unresolved contradictions and accumulated logical errors can lead to degenerate generation patterns, undermining the interpretability and meaningfulness of the produced narratives. These limitations are particularly pronounced in interactive role-playing environments, where narrative progression depends on consistent state tracking, causal reasoning, and rule-governed decision making. This dissertation investigates how LLMs can be augmented with state-aware representations and causal reasoning mechanisms to support coherent, controllable, and long-horizon narrative generation in interactive role-playing settings.
+This repository contains a research prototype for studying state tracking and rule-constrained generation in LLM-based interactive role-playing environments. It explores whether separating narrative generation from state observation can help a Game Master LLM maintain a consistent world state across player interactions.
+
+## Research reports
+
+- [Evaluating State Tracking in LLM-based Interactive Narrative Generation](./report.pdf) — compares four approaches to game-state management and evaluates the effect of an external Observer LLM on state-tracking accuracy.
+- [Dynamic State Maintenance and Rule-Constrained Generation in LLM-Based Interactive Narratives](./report2.pdf) — extends the evaluation to terminal-state recognition and rule-constrained interactions. The results show benefits for state maintenance and some task outcomes, but do not establish consistent improvements in narrative coherence or termination detection.
+
+The reports provide the full research questions, experimental setup, results, and limitations.
